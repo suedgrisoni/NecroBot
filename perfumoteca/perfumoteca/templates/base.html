@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Perfumoteca{% endblock %}</title>
+<style>
+  :root {
+    --fundo: #f6f1e9; --papel: #fffdf9; --tinta: #2b2420; --suave: #7a6d62;
+    --madeira: #8a5a3b; --madeira-escura: #5e3b25; --destaque: #a8452f; --linha: #e4d9cb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fundo: #1d1916; --papel: #28221e; --tinta: #efe6dc; --suave: #a99a8c;
+            --madeira: #6b4630; --madeira-escura: #3f2a1c; --destaque: #e07a5f; --linha: #3a312b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--tinta);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: inherit; }
+  header { background: var(--madeira-escura); color: #f6ead9; padding: 14px 24px;
+           display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0; font: 600 26px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .5px; }
+  header a { text-decoration: none; }
+  header .estat { font-size: 13px; opacity: .85; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+          background: var(--linha); color: var(--tinta); margin: 2px 4px 2px 0; }
+  .chip.forte { background: var(--destaque); color: #fff; }
+  input, select, button { font: inherit; padding: 7px 10px; border: 1px solid var(--linha);
+          border-radius: 6px; background: var(--papel); color: var(--tinta); }
+  button { background: var(--madeira); color: #fff; border: 0; cursor: pointer; }
+</style>
+{% block estilo %}{% endblock %}
+</head>
+<body>
+<header>
+  <h1><a href="{{ url_for('biblioteca') }}">Perfumoteca</a></h1>
+  {% block cabecalho %}{% endblock %}
+</header>
+<main>{% block conteudo %}{% endblock %}</main>
+</body>
+</html>

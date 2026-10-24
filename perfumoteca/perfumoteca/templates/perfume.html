@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titulo %}{{ p.nome }} · Perfumoteca{% endblock %}
+{% block estilo %}
+<style>
+  .ficha { display: grid; grid-template-columns: 280px 1fr; gap: 28px; }
+  @media (max-width: 760px) { .ficha { grid-template-columns: 1fr; } }
+  .capa { background: #fff; border-radius: 8px; padding: 10px; border-left: 8px solid var(--madeira); }
+  .capa img { width: 100%; display: block; }
+  h2 { font: 600 30px/1.15 Georgia, serif; margin: 0 0 4px; }
+  h3 { font: 600 18px Georgia, serif; margin: 26px 0 8px; border-bottom: 1px solid var(--linha); padding-bottom: 4px; }
+  .meta { color: var(--suave); }
+  .acorde { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  .acorde span { width: 120px; font-size: 13px; }
+  .acorde div { height: 14px; border-radius: 3px; background: var(--destaque); opacity: .8; }
+  .piramide { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .piramide div { background: var(--papel); padding: 10px; border-radius: 8px; border: 1px solid var(--linha); }
+  .votos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .votos div { background: var(--papel); padding: 10px; border-radius: 8px; border: 1px solid var(--linha); font-size: 13px; }
+  .review { background: var(--papel); border: 1px solid var(--linha); border-radius: 8px; padding: 12px 14px; margin: 10px 0; }
+  .review .cab { font-size: 12px; color: var(--suave); margin-bottom: 4px; }
+  .positivo { color: #3d8b4f; } .negativo { color: var(--destaque); }
+  form.link { display: flex; gap: 8px; margin-top: 10px; } form.link input { flex: 1; }
+</style>
+{% endblock %}
+{% block conteudo %}
+<div class="ficha">
+  <div>
+    <div class="capa"><img src="{{ p.imagem }}" alt=""></div>
+    <p class="meta">Loja: <a href="{{ p.link_loja }}" target="_blank" rel="noopener">{{ p.preco }}</a><br>
+      {{ p.categoria_loja }}</p>
+    {% if p.fragrantica_url %}<p><a href="{{ p.fragrantica_url }}" target="_blank" rel="noopener">Ver no Fragrantica ↗</a></p>{% endif %}
+  </div>
+  <div>
+    <div class="meta">{{ p.marca }}</div>
+    <h2>{{ p.nome }}</h2>
+    <div class="meta">{{ p.concentracao or '' }}{% if p.ano %} · {{ p.ano }}{% endif %}{% if p.genero %} · {{ p.genero }}{% endif %}
+      {% if p.perfumista %} · perfumista: {{ p.perfumista }}{% endif %}</div>
+    <p>
+      {% if p.nota %}<span class="chip forte">★ {{ p.nota }} ({{ p.votos or 0 }} votos)</span>{% endif %}
+      {% if p.familia %}<span class="chip forte">{{ p.familia }}</span>{% endif %}
+      {% for e in p.estacoes %}<span class="chip">{{ e }}</span>{% endfor %}
+      {% for t in p.tags %}<span class="chip">{{ t }}</span>{% endfor %}
+    </p>
+
+    {% if p.status != 'coletado' %}
+    <p class="meta">{{ 'Não foi encontrado automaticamente no Fragrantica.' if p.status == 'nao_encontrado'
+                       else 'Ainda na fila de coleta.' }} Se souber o link certo, cole aqui:</p>
+    <form class="link" method="post" action="{{ url_for('definir_link', pid=p.id) }}">
+      <input name="url" placeholder="https://www.fragrantica.com/perfume/..." value="{{ p.fragrantica_url or '' }}">
+      <button>Salvar</button>
+    </form>
+    {% endif %}
+
+    {% if p.acordes %}<h3>Acordes principais</h3>
+      {% for a in p.acordes %}<div class="acorde"><span>{{ a.nome }}</span><div style="width: {{ (a.forca or 50) * 0.6 }}%"></div></div>{% endfor %}
+    {% endif %}
+
+    {% if p.notas_topo or p.notas_coracao or p.notas_fundo or p.notas_gerais %}<h3>Pirâmide olfativa</h3>
+    <div class="piramide">
+      {% for titulo, notas in [('Topo', p.notas_topo), ('Coração', p.notas_coracao), ('Fundo', p.notas_fundo), ('Notas', p.notas_gerais)] if notas %}
+      <div><strong>{{ titulo }}</strong><br>{% for n in notas %}<span class="chip">{{ n }}</span>{% endfor %}</div>
+      {% endfor %}
+    </div>{% endif %}
+
+    {% if p.votacoes %}<h3>Votação da comunidade</h3>
+    <div class="votos">
+      {% for grupo, v in p.votacoes.items() %}
+      <div><strong>{{ {'longevidade': 'Fixação', 'projecao': 'Projeção', 'genero': 'Gênero', 'custo_beneficio': 'Custo-benefício', 'estacao': 'Estação e horário'}.get(grupo, grupo) }}</strong><br>
+        {% for k, n in v|dictsort(by='value', reverse=true) %}{{ k }}: {{ n }}<br>{% endfor %}</div>
+      {% endfor %}
+    </div>{% endif %}
+
+    {% if p.descricao %}<h3>Descrição</h3><p>{{ p.descricao }}</p>{% endif %}
+
+    <h3>Reviews ({{ reviews|length }})
+      {% if reviews %}<small class="meta">· {{ sent.get('positivo', 0) }} positivos, {{ sent.get('negativo', 0) }} negativos,
+        {{ sent.get('neutro', 0) }} neutros</small>{% endif %}</h3>
+    {% for r in reviews %}
+    <div class="review">
+      <div class="cab">{{ r.autor or 'anônimo' }}{% if r.data %} · {{ r.data }}{% endif %} ·
+        <span class="{{ r.sentimento }}">{{ r.sentimento }}</span></div>
+      {{ r.texto }}
+    </div>
+    {% else %}<p class="meta">Nenhum review coletado ainda.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -40,14 +40,15 @@
 <div class="grade">
   <!-- Conta -->
   <div class="cartao">
-    <h3>Conta do Fragrantica</h3>
+    <h3>Conta do Fragrantica <small style="font: 400 13px system-ui; color: var(--suave)">(opcional)</small></h3>
     <div class="situacao"><span class="bolinha" id="conta-bolinha"></span><span id="conta-texto">…</span></div>
     <form class="login" method="post" action="/painel/login" id="form-login">
       <input type="text" name="usuario" placeholder="Usuário ou e-mail" autocomplete="username">
       <input type="password" name="senha" placeholder="Senha" autocomplete="current-password">
       <button>Entrar</button>
     </form>
-    <p>O app abre o Fragrantica numa janela e digita seus dados por você. A senha <strong>não é salva</strong>:
+    <p><strong>Não é preciso entrar para coletar</strong>: as páginas de perfume são públicas.
+       Se quiser entrar, o app abre o Fragrantica numa janela e digita seus dados por você. A senha <strong>não é salva</strong>:
        depois do login fica guardada só a sessão, como no seu navegador. Se aparecer captcha, resolva na janela.
        Deixe os campos vazios para digitar você mesmo na janela.</p>
     <form method="post" action="/painel/login-ok" id="form-login-ok" hidden>
@@ -136,7 +137,7 @@ async function atualizar() {
   const c = e.conta || {};
   $("conta-bolinha").className = "bolinha " + (e.tarefa === "login" ? "ativa" : c.logado ? "on" : "");
   $("conta-texto").textContent = e.tarefa === "login" ? "Fazendo login na janela do navegador…"
-    : c.logado ? `Conectado${c.usuario ? " como " + c.usuario : ""} (desde ${c.quando})` : "Não conectado";
+    : c.logado ? `Conectado${c.usuario ? " como " + c.usuario : ""} (desde ${c.quando})` : "Não conectado (a coleta funciona sem login)";
   $("form-login-ok").hidden = e.tarefa !== "login";
   $("form-login").querySelector("button").textContent = c.logado ? "Entrar novamente" : "Entrar";
 

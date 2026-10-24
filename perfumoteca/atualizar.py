@@ -57,9 +57,9 @@ def atualizar():
         destino.parent.mkdir(parents=True, exist_ok=True)
         with pacote.open(item) as origem, open(destino, "wb") as saida:
             shutil.copyfileobj(origem, saida)
-    if (AQUI / "Perfumoteca.novo.bat").exists() and \
-            (AQUI / "Perfumoteca.novo.bat").read_bytes() == (AQUI / "Perfumoteca.bat").read_bytes():
-        (AQUI / "Perfumoteca.novo.bat").unlink()
+    novo, atual_bat = AQUI / "Perfumoteca.novo.bat", AQUI / "Perfumoteca.bat"
+    if novo.exists() and (not atual_bat.exists() or novo.read_bytes() == atual_bat.read_bytes()):
+        novo.replace(atual_bat)  # igual ao atual (nada a trocar) ou não havia atalho
 
     if (AQUI / "requirements.txt").read_bytes() != req_antes:
         print("Instalando novas dependências...")
@@ -69,4 +69,7 @@ def atualizar():
 
 
 if __name__ == "__main__":
-    atualizar()
+    try:
+        atualizar()
+    except Exception as e:  # noqa: BLE001 — uma atualização com problema nunca impede o app de abrir
+        print(f"Atualização falhou ({e}). Abrindo a versão atual.")

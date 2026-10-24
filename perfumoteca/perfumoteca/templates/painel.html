@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titulo %}Painel · Perfumoteca{% endblock %}
+{% block estilo %}
+<style>
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .cartao { background: var(--papel); border: 1px solid var(--linha); border-radius: 10px; padding: 16px; }
+  .cartao h3 { margin: 0 0 6px; font: 600 18px Georgia, serif; }
+  .cartao p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
+  .cartao form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .cartao input[type=text], .cartao input[type=url] { flex: 1 1 180px; }
+  .cartao input[type=number] { width: 70px; }
+  button.secundario { background: var(--linha); color: var(--tinta); }
+  button.perigo { background: var(--destaque); }
+  .aviso { background: var(--papel); border-left: 4px solid var(--destaque); padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; }
+  #status { font-weight: 600; }
+  #log { background: #1d1916; color: #e9dfd3; font: 12px/1.5 ui-monospace, Consolas, monospace;
+         padding: 12px; border-radius: 8px; height: 280px; overflow: auto; white-space: pre-wrap; margin: 0; }
+  .numeros { display: flex; gap: 22px; flex-wrap: wrap; }
+  .numeros div strong { display: block; font: 600 26px Georgia, serif; }
+</style>
+{% endblock %}
+{% block conteudo %}
+{% if msg %}<div class="aviso">{{ msg }}</div>{% endif %}
+
+<div class="grade">
+  <div class="cartao">
+    <h3>1. Conta do Fragrantica</h3>
+    <p>{{ 'Já existe uma sessão salva. Refaça o login só se a coleta parar de reconhecer sua conta.' if perfil_existe
+          else 'Abre uma janela do navegador para você entrar na sua conta. A sessão fica salva.' }}</p>
+    <form method="post" action="/painel/login"><button>Abrir janela de login</button></form>
+    <form method="post" action="/painel/login-ok" id="form-login-ok" hidden>
+      <button class="secundario">Já entrei na minha conta ✓</button></form>
+  </div>
+
+  <div class="cartao">
+    <h3>2. Coletar</h3>
+    <p>Visita os perfumes da fila, um a cada 1–2 minutos, numa janela do navegador.</p>
+    <form method="post" action="/painel/coletar">
+      Coletar agora <input type="number" name="limite" value="5" min="1" max="50"> perfumes
+      <button>Começar</button>
+    </form>
+    <form method="post" action="/painel/auto">
+      Automático das <input type="number" name="inicio" value="9" min="0" max="23">h às
+      <input type="number" name="fim" value="23" min="1" max="24">h <button>Ligar</button>
+    </form>
+    <form method="post" action="/painel/parar"><button class="perigo">Parar</button></form>
+  </div>
+
+  <div class="cartao">
+    <h3>3. Adicionar perfumes</h3>
+    <p>Cole o link do perfume no Fragrantica, ou informe marca e nome para o app procurar.</p>
+    <form method="post" action="/perfume/novo">
+      <input type="url" name="url" placeholder="https://www.fragrantica.com/perfume/...">
+      <button>Adicionar</button>
+    </form>
+    <form method="post" action="/perfume/novo">
+      <input type="text" name="marca" placeholder="Marca" style="flex-basis: 110px">
+      <input type="text" name="nome" placeholder="Nome do perfume" required>
+      <button>Adicionar</button>
+    </form>
+    <form method="post" action="/painel/importar">
+      <input type="url" name="url" placeholder="Feed XML de loja (vazio = Lojabit)">
+      <button class="secundario">Importar feed</button>
+    </form>
+  </div>
+</div>
+
+<div class="cartao" style="margin-top: 16px">
+  <div class="numeros">
+    <div><strong>{{ contagem.get('coletado', 0) }}</strong>catalogados</div>
+    <div><strong>{{ contagem.get('pendente', 0) }}</strong>na fila</div>
+    <div><strong>{{ contagem.get('nao_encontrado', 0) }}</strong>não encontrados</div>
+  </div>
+  <p style="margin: 14px 0 8px">Situação: <span id="status">…</span></p>
+  <pre id="log"></pre>
+</div>
+
+<script>
+const nomes = {login: "janela de login aberta", coleta: "coletando", auto: "modo automático ligado"};
+async function atualizar() {
+  try {
+    const r = await fetch("/painel/estado");
+    const e = await r.json();
+    document.getElementById("status").textContent = e.tarefa ? nomes[e.tarefa] : "parado";
+    document.getElementById("form-login-ok").hidden = e.tarefa !== "login";
+    const log = document.getElementById("log");
+    const noFim = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+    log.textContent = e.log.join("\n") || "Nenhuma atividade ainda.";
+    if (noFim) log.scrollTop = log.scrollHeight;
+  } catch (_) {
+    document.getElementById("status").textContent = "app fechado?";
+  }
+}
+atualizar();
+setInterval(atualizar, 3000);
+</script>
+{% endblock %}

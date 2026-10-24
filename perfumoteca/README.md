@@ -11,31 +11,30 @@ Biblioteca pessoal de perfumes que roda no seu computador. O app:
 ![Biblioteca](docs/biblioteca.png)
 ![Ficha do perfume](docs/perfume.png)
 
-## Instalação (uma vez)
+## Como abrir
 
 Precisa do [Python 3.10+](https://www.python.org/downloads/) (no Windows, marque "Add Python to PATH").
 
+- **Windows:** dê duplo clique em `Perfumoteca.bat`.
+- **Mac/Linux:** rode `./perfumoteca.sh`.
+
+Na primeira vez ele instala tudo sozinho (leva alguns minutos). Depois o app abre no navegador,
+no **Painel de coleta**, onde dá para fazer tudo por botões:
+
+1. **Abrir janela de login**: abre o Fragrantica; entre na sua conta e clique em "Já entrei na minha conta".
+2. **Importar feed**: monta a lista de perfumes da loja (≈540 perfumes únicos).
+3. **Coletar agora** (comece com 3–5) ou **Ligar** o modo automático; **Parar** interrompe na hora.
+4. **Adicionar perfumes**: cole o link do Fragrantica ou informe marca e nome.
+5. **Biblioteca**: a estante com busca, filtros e a ficha de cada perfume.
+
+Para o app continuar coletando, deixe a janela do terminal aberta.
+
+![Painel](docs/painel.png)
+
+### Pelo terminal (opcional)
+
 ```bash
-cd perfumoteca
-python -m venv .venv
-# Windows:  .venv\Scripts\activate      Mac/Linux:  source .venv/bin/activate
-pip install -r requirements.txt
-python -m playwright install chromium
-```
-
-## Uso
-
-```bash
-python main.py importar   # baixa o feed da loja e monta a lista (≈540 perfumes únicos)
-python main.py login      # abre o navegador: entre na sua conta do Fragrantica e aperte ENTER
-python main.py coletar --limite 5   # primeira rodada pequena para conferir
-python main.py web        # abra http://127.0.0.1:5000
-```
-
-Para deixar rodando sozinho (atualiza o feed uma vez por dia e coleta aos poucos):
-
-```bash
-python main.py auto --inicio 9 --fim 23
+python main.py importar | login | coletar --limite 5 | auto --inicio 9 --fim 23 | web
 ```
 
 ## Como a coleta se comporta

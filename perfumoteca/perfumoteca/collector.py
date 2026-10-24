@@ -6,18 +6,33 @@ você resolver na janela. Se o site sinalizar excesso de acessos, ele para.
 """
 import json
 import random
-import time
+import threading
 import urllib.parse
+from collections import deque
 from datetime import datetime
 
 from . import classify, db, fragrantica
 
 PERFIL = db.DATA_DIR / "navegador"
 INTERVALO = (60, 120)  # segundos entre perfumes
+PARAR = threading.Event()   # acionado pelo botão "Parar" do painel
+LOG = deque(maxlen=300)     # últimas mensagens, mostradas no painel
+
+
+class Interrompido(Exception):
+    pass
 
 
 def log(msg):
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+    linha = f"[{datetime.now():%H:%M:%S}] {msg}"
+    LOG.append(linha)
+    print(linha, flush=True)
+
+
+def pausa(segundos):
+    """Espera, mas acorda na hora se pedirem para parar."""
+    if PARAR.wait(segundos):
+        raise Interrompido()
 
 
 def abrir_navegador(p):
@@ -27,25 +42,37 @@ def abrir_navegador(p):
     return ctx, (ctx.pages[0] if ctx.pages else ctx.new_page())
 
 
-def login():
-    """Abre o Fragrantica para você entrar na sua conta. A sessão fica salva no perfil local."""
+def login(concluido=None):
+    """Abre o Fragrantica para você entrar na sua conta. A sessão fica salva no perfil local.
+
+    Termina quando `concluido` (Event) é acionado, quando você fecha a janela ou, no
+    terminal, quando aperta ENTER.
+    """
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         ctx, page = abrir_navegador(p)
         page.goto(fragrantica.BASE + "/login/", wait_until="domcontentloaded")
-        input("Faça login na janela do navegador e depois aperte ENTER aqui... ")
-        ctx.close()
-    log("Sessão salva em " + str(PERFIL))
+        log("Janela de login aberta: entre na sua conta do Fragrantica.")
+        if concluido is None:
+            input("Faça login na janela do navegador e depois aperte ENTER aqui... ")
+        else:
+            while not concluido.is_set() and not PARAR.is_set() and ctx.pages:
+                page.wait_for_timeout(1000) if not page.is_closed() else concluido.wait(1)
+        try:
+            ctx.close()
+        except Exception:  # noqa: BLE001 — a janela pode já ter sido fechada
+            pass
+    log("Sessão salva. Pronto para coletar.")
 
 
 def navegar_como_pessoa(page):
     """Rola a página aos poucos, com pausas irregulares, como quem está lendo."""
     for _ in range(random.randint(3, 7)):
         page.mouse.wheel(0, random.randint(250, 700))
-        time.sleep(random.uniform(1.5, 5))
+        pausa(random.uniform(1.5, 5))
     if random.random() < 0.3:
         page.mouse.wheel(0, -random.randint(200, 600))
-        time.sleep(random.uniform(1, 3))
+        pausa(random.uniform(1, 3))
 
 
 def visitar(page, url):
@@ -58,10 +85,10 @@ def visitar(page, url):
             break
         if _ == 0:
             log("Verificação na tela: resolva na janela do navegador; aguardando...")
-        time.sleep(5)
+        pausa(5)
     else:
         raise PermissionError("Verificação não resolvida.")
-    time.sleep(random.uniform(2, 4))
+    pausa(random.uniform(2, 4))
     navegar_como_pessoa(page)
     return page.content()
 
@@ -111,10 +138,12 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
         ctx, page = abrir_navegador(p)
         try:
             for i, perfume in enumerate(fila):
+                if PARAR.is_set():
+                    break
                 if i:
                     espera = random.uniform(*intervalo)
                     log(f"Pausa de {espera:.0f}s...")
-                    time.sleep(espera)
+                    pausa(espera)
                 rotulo = f"{perfume['marca']} {perfume['nome']}"
                 try:
                     url = perfume["fragrantica_url"]
@@ -129,10 +158,13 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
                             con.commit()
                             log(f"Não encontrado: {rotulo} (dá para colar o link manualmente na interface)")
                             continue
-                        time.sleep(random.uniform(4, 12))  # "lendo" os resultados antes de clicar
+                        pausa(random.uniform(4, 12))  # "lendo" os resultados antes de clicar
                     dados = fragrantica.extrair_perfume(visitar(page, url))
                     novos = salvar(con, perfume, url, dados)
                     log(f"OK: {rotulo} — {len(dados['acordes'])} acordes, {novos} review(s) novo(s)")
+                except Interrompido:
+                    log("Coleta interrompida.")
+                    break
                 except PermissionError as e:
                     log(f"Parando a rodada: {e}")
                     break
@@ -140,5 +172,7 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
                     con.execute("UPDATE perfumes SET tentativas=tentativas+1 WHERE id=?", (perfume["id"],))
                     con.commit()
                     log(f"Erro em {rotulo}: {e}")
+        except Interrompido:
+            log("Coleta interrompida.")
         finally:
             ctx.close()

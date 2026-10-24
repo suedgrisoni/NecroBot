@@ -1,7 +1,8 @@
 """Interface local em formato de biblioteca: http://127.0.0.1:5000"""
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import db
+from . import db, feed
+from .painel import FEED_PADRAO, painel
 
 app = Flask(__name__)
 POR_PAGINA = 48
@@ -68,6 +69,67 @@ def definir_link(pid):
     if url.startswith("https://www.fragrantica.com/perfume/"):
         con.execute("UPDATE perfumes SET fragrantica_url=?, status='pendente', tentativas=0 WHERE id=?", (url, pid))
         con.commit()
+    return redirect(url_for("perfume", pid=pid))
+
+
+@app.route("/painel")
+def tela_painel():
+    con = db.connect()
+    contagem = dict(con.execute("SELECT status, COUNT(*) FROM perfumes GROUP BY status").fetchall())
+    perfil_existe = (db.DATA_DIR / "navegador").exists()
+    return render_template("painel.html", contagem=contagem, feed_padrao=FEED_PADRAO,
+                           perfil_existe=perfil_existe, msg=request.args.get("msg"))
+
+
+@app.get("/painel/estado")
+def painel_estado():
+    return jsonify(painel.estado())
+
+
+@app.post("/painel/<acao>")
+def painel_acao(acao):
+    f = request.form
+    if acao == "login":
+        ok = painel.login()
+    elif acao == "login-ok":
+        painel.concluir_login()
+        ok = True
+    elif acao == "coletar":
+        ok = painel.coletar(f.get("limite", 5, type=int))
+    elif acao == "auto":
+        ok = painel.auto(f.get("inicio", 9, type=int), f.get("fim", 23, type=int), f.get("limite", 15, type=int))
+    elif acao == "parar":
+        painel.parar()
+        ok = True
+    elif acao == "importar":
+        try:
+            total = feed.importar(f.get("url") or FEED_PADRAO)
+            return redirect(url_for("tela_painel", msg=f"Feed importado: {total} perfumes na biblioteca."))
+        except Exception as e:  # noqa: BLE001
+            return redirect(url_for("tela_painel", msg=f"Não consegui importar o feed: {e}"))
+    else:
+        abort(404)
+    return redirect(url_for("tela_painel", msg=None if ok else "Já existe uma tarefa rodando. Pare-a antes."))
+
+
+@app.post("/perfume/novo")
+def novo_perfume():
+    """Adiciona um perfume à fila: pelo link do Fragrantica ou por marca + nome."""
+    f = request.form
+    url = f.get("url", "").strip()
+    marca, nome = f.get("marca", "").strip(), f.get("nome", "").strip()
+    if url.startswith("https://www.fragrantica.com/perfume/") and not nome:
+        partes = url.rstrip("/").split("/")
+        marca = marca or partes[-2].replace("-", " ")
+        nome = partes[-1].rsplit("-", 1)[0].replace("-", " ")
+    if not nome:
+        return redirect(url_for("tela_painel", msg="Informe o nome do perfume ou o link do Fragrantica."))
+    con = db.connect()
+    con.execute("""INSERT INTO perfumes(chave, nome, marca, categoria_loja, fragrantica_url) VALUES (?,?,?,?,?)
+                   ON CONFLICT(chave) DO UPDATE SET fragrantica_url=COALESCE(excluded.fragrantica_url, fragrantica_url)""",
+                (feed.normalizar(f"{marca} {nome}"), nome, marca, "Adicionado à mão", url or None))
+    con.commit()
+    pid = con.execute("SELECT id FROM perfumes WHERE chave=?", (feed.normalizar(f"{marca} {nome}"),)).fetchone()[0]
     return redirect(url_for("perfume", pid=pid))
 
 

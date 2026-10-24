@@ -8,4 +8,5 @@ if [ ! -d .venv ]; then
   .venv/bin/python -m pip install -r requirements.txt
   .venv/bin/python -m playwright install chromium
 fi
+.venv/bin/python atualizar.py || true
 exec .venv/bin/python main.py

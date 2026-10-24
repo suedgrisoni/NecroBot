@@ -4,6 +4,13 @@ title Perfumoteca
 rem Duplo clique para abrir a Perfumoteca no Windows.
 cd /d "%~dp0"
 
+rem Uma atualizacao anterior trouxe um atalho novo: troca e reabre.
+if exist "Perfumoteca.novo.bat" (
+  move /y "Perfumoteca.novo.bat" "Perfumoteca.bat" >nul
+  start "" "%~f0"
+  exit /b 0
+)
+
 if exist ".venv\Scripts\python.exe" goto abrir
 
 echo Primeira execucao: instalando a Perfumoteca. Isso leva alguns minutos...
@@ -29,12 +36,18 @@ if errorlevel 1 goto erro
 if errorlevel 1 goto erro
 
 :abrir
+".venv\Scripts\python.exe" atualizar.py
+if exist "Perfumoteca.novo.bat" goto reabrir
 echo.
 echo Perfumoteca aberta em http://127.0.0.1:5000
 echo Deixe esta janela aberta enquanto usa o app. Para fechar, feche esta janela.
 echo.
 ".venv\Scripts\python.exe" main.py
 pause
+exit /b 0
+
+:reabrir
+start "" "%~f0"
 exit /b 0
 
 :erro

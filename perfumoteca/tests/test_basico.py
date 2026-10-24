@@ -63,3 +63,20 @@ def test_extrair_e_salvar(tmp_path):
     assert con.execute("SELECT rowid FROM busca WHERE busca MATCH 'dates'").fetchone()[0] == p["id"]
     sents = [r[0] for r in con.execute("SELECT sentimento FROM reviews ORDER BY id")]
     assert sents == ["positivo", "negativo"]
+
+
+def test_dados_da_descricao():
+    """Página sem pirâmide/acordes no HTML: usa a descrição (caso real do Hypnotic Poison)."""
+    html = """<h1 itemprop="name">Hypnotic Poison Dior</h1>
+    <a href="/noses/">Perfumers</a><a href="/noses/Annick-Menardo.html">Annick Menardo</a>
+    <div itemprop="description">Hypnotic Poison by Dior is a Oriental Vanilla fragrance for women. Hypnotic Poison
+    was launched in 1998. The nose behind this fragrance is Annick Menardo. Top notes are Coconut, Plum and Apricot;
+    middle notes are Brazilian Rosewood, Jasmine, Tuberose, Caraway, Rose and Lily-of-the-Valley; base notes are
+    Vanilla, Almond, Sandalwood and Musk.</div>"""
+    d = fragrantica.extrair_perfume(html)
+    assert d["perfumista"] == "Annick Menardo"
+    assert d["genero"] == "for women" and d["ano"] == 1998
+    assert d["notas_topo"] == ["Coconut", "Plum", "Apricot"]
+    assert d["notas_coracao"][-1] == "Lily-of-the-Valley" and d["notas_fundo"][0] == "Vanilla"
+    assert d["notas_gerais"] == []
+    assert classify.familia(d["acordes"], d["familia_site"]) == "Âmbar / Oriental"

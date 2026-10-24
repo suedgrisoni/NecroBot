@@ -19,7 +19,14 @@ NEGATIVAS = {"hate", "awful", "terrible", "cheap", "synthetic", "headache", "dis
              "scrubber", "nauseating", "horrible", "ruim", "fraco", "enjoativo"}
 
 
-def familia(acordes):
+# Famílias do texto do Fragrantica ("Oriental Vanilla", "Woody Aromatic"...) -> nossas famílias.
+FAMILIAS_SITE = {"oriental": "Âmbar / Oriental", "amber": "Âmbar / Oriental", "gourmand": "Gourmand",
+                 "woody": "Amadeirado", "floral": "Floral", "citrus": "Fresco / Cítrico", "green": "Fresco / Cítrico",
+                 "aquatic": "Aquático", "aromatic": "Aromático / Fougère", "fougere": "Aromático / Fougère",
+                 "chypre": "Couro / Animálico", "leather": "Couro / Animálico", "fruity": "Frutado"}
+
+
+def familia(acordes, familia_site=None):
     pontos = {}
     for i, a in enumerate(acordes[:5]):
         peso = (a.get("forca") or 100 - i * 15)
@@ -27,7 +34,12 @@ def familia(acordes):
         for fam, chaves in FAMILIAS.items():
             if nome in chaves:
                 pontos[fam] = pontos.get(fam, 0) + peso
-    return max(pontos, key=pontos.get) if pontos else None
+    if pontos:
+        return max(pontos, key=pontos.get)
+    for palavra in (familia_site or "").lower().split():  # a primeira palavra é a família principal
+        if palavra in FAMILIAS_SITE:
+            return FAMILIAS_SITE[palavra]
+    return None
 
 
 def estacoes(votacoes):

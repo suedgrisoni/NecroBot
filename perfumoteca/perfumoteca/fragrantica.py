@@ -98,14 +98,39 @@ def extrair_perfume(html):
         d["notas_gerais"] = list(dict.fromkeys(
             _texto(a) for a in piramide.select("a[href*='/notes/']") if _texto(a)))
 
-    d["perfumista"] = ", ".join(dict.fromkeys(_texto(a) for a in soup.select("a[href*='/noses/']") if _texto(a))) or None
     desc = soup.select_one("[itemprop=description]")
     d["descricao"] = _texto(desc)
-    m = re.search(r"launched in (\d{4})", d["descricao"] or "")
+    texto = d["descricao"] or ""
+    m = re.search(r"launched in (\d{4})", texto)
     d["ano"] = int(m.group(1)) if m else None
+
+    # A descrição padrão do Fragrantica traz família, gênero, perfumista e pirâmide em texto.
+    m = re.search(r"is an? (.+?) fragrance for (women and men|women|men)", texto)
+    d["familia_site"] = m.group(1) if m else None
+    if m and not d.get("genero"):
+        d["genero"] = "for " + m.group(2)
+    m = re.search(r"The noses? behind this fragrance (?:is|are) (.+?)\.(?:\s|$)", texto)
+    if m:
+        d["perfumista"] = ", ".join(_lista(m.group(1)))
+    else:
+        nomes = (_texto(a) for a in soup.select("a[href*='/noses/']")
+                 if not a.get("href", "").rstrip("/").endswith("/noses"))
+        d["perfumista"] = ", ".join(dict.fromkeys(n for n in nomes if n and n.lower() != "perfumers")) or None
+    if not (d["notas_topo"] or d["notas_coracao"] or d["notas_fundo"]):
+        for campo, rotulo in (("notas_topo", "Top"), ("notas_coracao", "[Mm]iddle|[Hh]eart"), ("notas_fundo", "[Bb]ase")):
+            m = re.search(rf"(?:{rotulo}) notes? (?:is|are) (.+?)(?:;|\.(?:\s|$))", texto)
+            if m:
+                d[campo] = _lista(m.group(1))
+        if d["notas_topo"] or d["notas_coracao"] or d["notas_fundo"]:
+            d["notas_gerais"] = []
     d["votacoes"] = extrair_votacoes(soup)
     d["reviews"] = extrair_reviews(soup)
     return d
+
+
+def _lista(texto):
+    """'Coconut, Plum and Apricot' -> ['Coconut', 'Plum', 'Apricot']"""
+    return [p.strip() for p in re.split(r",\s*|\s+and\s+", texto) if p.strip()]
 
 
 def extrair_votacoes(soup):

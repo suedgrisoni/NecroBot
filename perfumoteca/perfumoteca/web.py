@@ -1,7 +1,7 @@
 """Interface local em formato de biblioteca: http://127.0.0.1:5000"""
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import db, feed
+from . import collector, db, feed
 from .painel import FEED_PADRAO, painel
 
 app = Flask(__name__)
@@ -97,6 +97,9 @@ def painel_acao(acao):
         ok = painel.coletar(f.get("limite", 5, type=int))
     elif acao == "auto":
         ok = painel.auto(f.get("inicio", 9, type=int), f.get("fim", 23, type=int), f.get("limite", 15, type=int))
+    elif acao == "reprocessar":
+        n = collector.reprocessar()
+        return redirect(url_for("tela_painel", msg=f"{n} perfume(s) reprocessado(s)."))
     elif acao == "parar":
         painel.parar()
         ok = True

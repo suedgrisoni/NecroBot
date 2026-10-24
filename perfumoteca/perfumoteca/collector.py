@@ -15,6 +15,7 @@ from datetime import datetime
 from . import classify, db, fragrantica
 
 PERFIL = db.DATA_DIR / "navegador"
+PAGINAS = db.DATA_DIR / "paginas"   # cópia de cada página coletada, para reprocessar sem revisitar o site
 INTERVALO = (60, 120)  # segundos entre perfumes
 PARAR = threading.Event()   # acionado pelo botão "Parar" do painel
 LOG = deque(maxlen=300)     # últimas mensagens, mostradas no painel
@@ -131,6 +132,13 @@ def navegar_como_pessoa(page):
     if random.random() < 0.3:
         page.mouse.wheel(0, -random.randint(200, 600))
         pausa(random.uniform(1, 3))
+    # Reviews e votações carregam só quando aparecem na tela: desce até o fim, aos poucos.
+    for _ in range(25):
+        if page.evaluate("window.scrollY + window.innerHeight >= document.body.scrollHeight - 50"):
+            break
+        page.mouse.wheel(0, random.randint(500, 900))
+        pausa(random.uniform(0.8, 2.2))
+    pausa(random.uniform(2, 4))
 
 
 def visitar(page, url):
@@ -154,7 +162,7 @@ def visitar(page, url):
 
 
 def salvar(con, perfume, url, dados):
-    fam = classify.familia(dados["acordes"])
+    fam = classify.familia(dados["acordes"], dados.get("familia_site"))
     con.execute(
         """UPDATE perfumes SET fragrantica_url=?, status='coletado', ano=?, perfumista=?, genero=?, nota=?,
                votos=?, acordes=?, notas_topo=?, notas_coracao=?, notas_fundo=?, notas_gerais=?, votacoes=?,
@@ -174,6 +182,19 @@ def salvar(con, perfume, url, dados):
     db.reindex(con, perfume["id"])
     con.commit()
     return novos
+
+
+def reprocessar():
+    """Relê as páginas já guardadas com o parser atual (sem acessar o site)."""
+    con = db.connect()
+    n = 0
+    for arq in sorted(PAGINAS.glob("*.html")):
+        perfume = con.execute("SELECT * FROM perfumes WHERE id=?", (int(arq.stem),)).fetchone()
+        if perfume and perfume["fragrantica_url"]:
+            salvar(con, perfume, perfume["fragrantica_url"], fragrantica.extrair_perfume(arq.read_text(encoding="utf-8")))
+            n += 1
+    log(f"{n} perfume(s) reprocessado(s) a partir das páginas guardadas.")
+    return n
 
 
 def proximos(con, limite, revisitar_dias):
@@ -225,7 +246,10 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
                             continue
                         pausa(random.uniform(4, 12))  # "lendo" os resultados antes de clicar
                     etapa("Abrindo a página do perfume")
-                    dados = fragrantica.extrair_perfume(visitar(page, url))
+                    html = visitar(page, url)
+                    PAGINAS.mkdir(parents=True, exist_ok=True)
+                    (PAGINAS / f"{perfume['id']}.html").write_text(html, encoding="utf-8")
+                    dados = fragrantica.extrair_perfume(html)
                     etapa("Classificando e salvando")
                     novos = salvar(con, perfume, url, dados)
                     log(f"OK: {rotulo} — {len(dados['acordes'])} acordes, {novos} review(s) novo(s)")

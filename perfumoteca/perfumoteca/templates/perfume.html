@@ -33,8 +33,8 @@
   <div>
     <div class="meta">{{ p.marca }}</div>
     <h2>{{ p.nome }}</h2>
-    <div class="meta">{{ p.concentracao or '' }}{% if p.ano %} · {{ p.ano }}{% endif %}{% if p.genero %} · {{ p.genero }}{% endif %}
-      {% if p.perfumista %} · perfumista: {{ p.perfumista }}{% endif %}</div>
+    <div class="meta">{{ [p.concentracao, p.ano, p.genero, ('perfumista: ' ~ p.perfumista) if p.perfumista]
+                         | select | join(' · ') }}</div>
     <p>
       {% if p.nota %}<span class="chip forte">★ {{ p.nota }} ({{ p.votos or 0 }} votos)</span>{% endif %}
       {% if p.familia %}<span class="chip forte">{{ p.familia }}</span>{% endif %}

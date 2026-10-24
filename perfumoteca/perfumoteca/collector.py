@@ -7,6 +7,7 @@ você resolver na janela. Se o site sinalizar excesso de acessos, ele para.
 import json
 import random
 import threading
+import time
 import urllib.parse
 from collections import deque
 from datetime import datetime
@@ -17,6 +18,9 @@ PERFIL = db.DATA_DIR / "navegador"
 INTERVALO = (60, 120)  # segundos entre perfumes
 PARAR = threading.Event()   # acionado pelo botão "Parar" do painel
 LOG = deque(maxlen=300)     # últimas mensagens, mostradas no painel
+CONTA = db.DATA_DIR / "conta.json"
+# O que está acontecendo agora, para a tela de progresso.
+PROGRESSO = {"etapa": None, "perfume": None, "rodada": [0, 0], "ate": None}
 
 
 class Interrompido(Exception):
@@ -27,6 +31,11 @@ def log(msg):
     linha = f"[{datetime.now():%H:%M:%S}] {msg}"
     LOG.append(linha)
     print(linha, flush=True)
+
+
+def etapa(texto, segundos=None):
+    PROGRESSO["etapa"] = texto
+    PROGRESSO["ate"] = time.time() + segundos if segundos else None
 
 
 def pausa(segundos):
@@ -42,27 +51,76 @@ def abrir_navegador(p):
     return ctx, (ctx.pages[0] if ctx.pages else ctx.new_page())
 
 
-def login(concluido=None):
+def conta():
+    try:
+        return json.loads(CONTA.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"logado": False}
+
+
+def _salvar_conta(**dados):
+    CONTA.parent.mkdir(parents=True, exist_ok=True)
+    CONTA.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+
+
+def esta_logado(page):
+    """Logado = existe um link de sair/perfil na página e não estamos mais na tela de login."""
+    if "/login" in page.url:
+        return False
+    return page.locator("a[href*='logout' i], a[href*='/member/']").count() > 0
+
+
+def _preencher_login(page, usuario, senha):
+    campo_usuario = page.locator("input[type=email], input[name*=user i], input[name*=email i], "
+                                 "input[name*=login i], input[id*=user i]").first
+    campo_senha = page.locator("input[type=password]").first
+    if not campo_usuario.count() or not campo_senha.count():
+        log("Não achei os campos de login; termine o login na janela do navegador.")
+        return
+    for campo, texto in ((campo_usuario, usuario), (campo_senha, senha)):
+        campo.click()
+        campo.press_sequentially(texto, delay=random.randint(60, 160))  # digita como uma pessoa
+        page.wait_for_timeout(random.randint(400, 1200))
+    campo_senha.press("Enter")
+    log("Dados de login enviados. Se aparecer verificação, resolva na janela.")
+
+
+def login(concluido=None, usuario=None, senha=None):
     """Abre o Fragrantica para você entrar na sua conta. A sessão fica salva no perfil local.
 
-    Termina quando `concluido` (Event) é acionado, quando você fecha a janela ou, no
-    terminal, quando aperta ENTER.
+    Se `usuario` e `senha` forem informados, o app digita por você (a senha não é guardada).
+    Termina quando o login é detectado, quando `concluido` (Event) é acionado, quando a
+    janela é fechada ou, no terminal, quando você aperta ENTER.
     """
     from playwright.sync_api import sync_playwright
+    etapa("Fazendo login")
     with sync_playwright() as p:
         ctx, page = abrir_navegador(p)
-        page.goto(fragrantica.BASE + "/login/", wait_until="domcontentloaded")
-        log("Janela de login aberta: entre na sua conta do Fragrantica.")
-        if concluido is None:
-            input("Faça login na janela do navegador e depois aperte ENTER aqui... ")
-        else:
-            while not concluido.is_set() and not PARAR.is_set() and ctx.pages:
-                page.wait_for_timeout(1000) if not page.is_closed() else concluido.wait(1)
         try:
-            ctx.close()
-        except Exception:  # noqa: BLE001 — a janela pode já ter sido fechada
-            pass
-    log("Sessão salva. Pronto para coletar.")
+            page.goto(fragrantica.BASE + "/login/", wait_until="domcontentloaded")
+            log("Janela de login aberta.")
+            if usuario and senha:
+                page.wait_for_timeout(random.randint(1500, 3000))
+                _preencher_login(page, usuario, senha)
+            if concluido is None:
+                input("Faça login na janela do navegador e depois aperte ENTER aqui... ")
+            else:
+                limite = time.time() + 10 * 60
+                while not concluido.is_set() and not PARAR.is_set() and not page.is_closed() \
+                        and time.time() < limite:
+                    page.wait_for_timeout(2000)
+                    if esta_logado(page):
+                        break
+            logado = not page.is_closed() and esta_logado(page) or bool(concluido and concluido.is_set())
+            _salvar_conta(logado=logado, usuario=usuario or conta().get("usuario"),
+                          quando=datetime.now().strftime("%d/%m/%Y %H:%M"))
+            log("Login confirmado. Pronto para coletar." if logado else "Login não confirmado.")
+        finally:
+            etapa(None)
+            try:
+                ctx.close()
+            except Exception:  # noqa: BLE001 — a janela pode já ter sido fechada
+                pass
 
 
 def navegar_como_pessoa(page):
@@ -85,10 +143,12 @@ def visitar(page, url):
             break
         if _ == 0:
             log("Verificação na tela: resolva na janela do navegador; aguardando...")
+            etapa("Aguardando você resolver a verificação na janela")
         pausa(5)
     else:
         raise PermissionError("Verificação não resolvida.")
     pausa(random.uniform(2, 4))
+    etapa("Lendo a página")
     navegar_como_pessoa(page)
     return page.content()
 
@@ -134,6 +194,7 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
         log("Nada para coletar agora.")
         return
     log(f"{len(fila)} perfume(s) na fila desta rodada.")
+    PROGRESSO["rodada"] = [0, len(fila)]
     with sync_playwright() as p:
         ctx, page = abrir_navegador(p)
         try:
@@ -143,11 +204,15 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
                 if i:
                     espera = random.uniform(*intervalo)
                     log(f"Pausa de {espera:.0f}s...")
+                    etapa("Pausa antes do próximo perfume", espera)
                     pausa(espera)
+                PROGRESSO["rodada"] = [i + 1, len(fila)]
+                PROGRESSO["perfume"] = {k: perfume[k] for k in ("id", "nome", "marca", "imagem")}
                 rotulo = f"{perfume['marca']} {perfume['nome']}"
                 try:
                     url = perfume["fragrantica_url"]
                     if not url:
+                        etapa("Procurando no Fragrantica")
                         q = urllib.parse.quote(f"{perfume['marca']} {perfume['nome']}")
                         visitar(page, f"{fragrantica.BASE}/search/?query={q}")
                         page.wait_for_timeout(3000)  # resultados carregam via JavaScript
@@ -159,7 +224,9 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
                             log(f"Não encontrado: {rotulo} (dá para colar o link manualmente na interface)")
                             continue
                         pausa(random.uniform(4, 12))  # "lendo" os resultados antes de clicar
+                    etapa("Abrindo a página do perfume")
                     dados = fragrantica.extrair_perfume(visitar(page, url))
+                    etapa("Classificando e salvando")
                     novos = salvar(con, perfume, url, dados)
                     log(f"OK: {rotulo} — {len(dados['acordes'])} acordes, {novos} review(s) novo(s)")
                 except Interrompido:
@@ -175,4 +242,6 @@ def coletar(limite=20, revisitar_dias=30, intervalo=INTERVALO):
         except Interrompido:
             log("Coleta interrompida.")
         finally:
+            etapa(None)
+            PROGRESSO["perfume"] = None
             ctx.close()

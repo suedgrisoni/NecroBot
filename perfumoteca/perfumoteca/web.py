@@ -76,9 +76,8 @@ def definir_link(pid):
 def tela_painel():
     con = db.connect()
     contagem = dict(con.execute("SELECT status, COUNT(*) FROM perfumes GROUP BY status").fetchall())
-    perfil_existe = (db.DATA_DIR / "navegador").exists()
     return render_template("painel.html", contagem=contagem, feed_padrao=FEED_PADRAO,
-                           perfil_existe=perfil_existe, msg=request.args.get("msg"))
+                           msg=request.args.get("msg"))
 
 
 @app.get("/painel/estado")
@@ -90,7 +89,7 @@ def painel_estado():
 def painel_acao(acao):
     f = request.form
     if acao == "login":
-        ok = painel.login()
+        ok = painel.login(f.get("usuario") or None, f.get("senha") or None)
     elif acao == "login-ok":
         painel.concluir_login()
         ok = True

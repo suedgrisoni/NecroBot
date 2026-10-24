@@ -4,9 +4,10 @@ Só uma tarefa roda por vez, porque o perfil do navegador não pode ser aberto d
 """
 import random
 import threading
+import time
 from datetime import datetime
 
-from . import collector, feed
+from . import collector, db, feed
 
 FEED_PADRAO = "https://www.lojabit.com/xml/2cabf/googlemerchant.xml"
 
@@ -45,9 +46,9 @@ class Painel:
         finally:
             self.tarefa = None
 
-    def login(self):
+    def login(self, usuario=None, senha=None):
         self.login_ok.clear()
-        return self._iniciar("login", collector.login, self.login_ok)
+        return self._iniciar("login", collector.login, self.login_ok, usuario, senha)
 
     def concluir_login(self):
         self.login_ok.set()
@@ -86,7 +87,20 @@ class Painel:
             collector.pausa(descanso)
 
     def estado(self):
-        return {"tarefa": self.tarefa if self.ocupado else None, "log": list(collector.LOG)[-80:]}
+        con = db.connect()
+        contagem = dict(con.execute("SELECT status, COUNT(*) FROM perfumes GROUP BY status").fetchall())
+        prog = dict(collector.PROGRESSO)
+        if prog["ate"]:
+            prog["restante"] = max(0, round(prog.pop("ate") - time.time()))
+        return {
+            "tarefa": self.tarefa if self.ocupado else None,
+            "conta": collector.conta(),
+            "progresso": prog,
+            "contagem": contagem,
+            "total": sum(contagem.values()),
+            "reviews": con.execute("SELECT COUNT(*) FROM reviews").fetchone()[0],
+            "log": list(collector.LOG)[-80:],
+        }
 
 
 painel = Painel()

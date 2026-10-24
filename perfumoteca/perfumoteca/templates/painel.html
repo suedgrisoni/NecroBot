@@ -1,40 +1,92 @@
 {% extends "base.html" %}
-{% block titulo %}Painel · Perfumoteca{% endblock %}
+{% block titulo %}Coleta · Perfumoteca{% endblock %}
 {% block estilo %}
 <style>
-  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-  .cartao { background: var(--papel); border: 1px solid var(--linha); border-radius: 10px; padding: 16px; }
-  .cartao h3 { margin: 0 0 6px; font: 600 18px Georgia, serif; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .cartao { background: var(--papel); border: 1px solid var(--linha); border-radius: 10px; padding: 18px; }
+  .cartao h3 { margin: 0 0 10px; font: 600 18px Georgia, serif; }
   .cartao p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
   .cartao form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .cartao input[type=text], .cartao input[type=url] { flex: 1 1 180px; }
+  .cartao input[type=text], .cartao input[type=url], .cartao input[type=password], .cartao input[type=email] { flex: 1 1 180px; }
   .cartao input[type=number] { width: 70px; }
+  form.login { flex-direction: column; align-items: stretch !important; }
+  form.login input { flex: none !important; }
   button.secundario { background: var(--linha); color: var(--tinta); }
   button.perigo { background: var(--destaque); }
   .aviso { background: var(--papel); border-left: 4px solid var(--destaque); padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; }
-  #status { font-weight: 600; }
+  .situacao { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 12px; }
+  .bolinha { width: 10px; height: 10px; border-radius: 50%; background: var(--suave); }
+  .bolinha.on { background: #3d8b4f; } .bolinha.ativa { background: #d99a2b; animation: pulsar 1.2s infinite; }
+  @keyframes pulsar { 50% { opacity: .3; } }
+  .atual { display: flex; gap: 16px; align-items: center; min-height: 130px; }
+  .atual img { width: 110px; height: 110px; object-fit: contain; background: #fff; border-radius: 8px; border-left: 5px solid var(--madeira); }
+  .atual .marca { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); }
+  .atual .nome { font: 600 20px/1.2 Georgia, serif; }
+  .atual .etapa { margin-top: 6px; font-size: 14px; }
+  .barra { height: 12px; background: var(--linha); border-radius: 999px; overflow: hidden; margin: 6px 0 4px; }
+  .barra div { height: 100%; background: var(--madeira); border-radius: 999px; transition: width .6s; }
+  .barra.grande { height: 20px; }
+  .legenda { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); }
+  .numeros { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 14px; }
+  .numeros div strong { display: block; font: 600 28px Georgia, serif; }
+  .numeros div { font-size: 13px; color: var(--suave); }
   #log { background: #1d1916; color: #e9dfd3; font: 12px/1.5 ui-monospace, Consolas, monospace;
-         padding: 12px; border-radius: 8px; height: 280px; overflow: auto; white-space: pre-wrap; margin: 0; }
-  .numeros { display: flex; gap: 22px; flex-wrap: wrap; }
-  .numeros div strong { display: block; font: 600 26px Georgia, serif; }
+         padding: 12px; border-radius: 8px; height: 220px; overflow: auto; white-space: pre-wrap; margin: 0; }
 </style>
 {% endblock %}
 {% block conteudo %}
 {% if msg %}<div class="aviso">{{ msg }}</div>{% endif %}
 
 <div class="grade">
+  <!-- Conta -->
   <div class="cartao">
-    <h3>1. Conta do Fragrantica</h3>
-    <p>{{ 'Já existe uma sessão salva. Refaça o login só se a coleta parar de reconhecer sua conta.' if perfil_existe
-          else 'Abre uma janela do navegador para você entrar na sua conta. A sessão fica salva.' }}</p>
-    <form method="post" action="/painel/login"><button>Abrir janela de login</button></form>
+    <h3>Conta do Fragrantica</h3>
+    <div class="situacao"><span class="bolinha" id="conta-bolinha"></span><span id="conta-texto">…</span></div>
+    <form class="login" method="post" action="/painel/login" id="form-login">
+      <input type="text" name="usuario" placeholder="Usuário ou e-mail" autocomplete="username">
+      <input type="password" name="senha" placeholder="Senha" autocomplete="current-password">
+      <button>Entrar</button>
+    </form>
+    <p>O app abre o Fragrantica numa janela e digita seus dados por você. A senha <strong>não é salva</strong>:
+       depois do login fica guardada só a sessão, como no seu navegador. Se aparecer captcha, resolva na janela.
+       Deixe os campos vazios para digitar você mesmo na janela.</p>
     <form method="post" action="/painel/login-ok" id="form-login-ok" hidden>
       <button class="secundario">Já entrei na minha conta ✓</button></form>
   </div>
 
+  <!-- Item atual -->
   <div class="cartao">
-    <h3>2. Coletar</h3>
-    <p>Visita os perfumes da fila, um a cada 1–2 minutos, numa janela do navegador.</p>
+    <h3>Analisando agora</h3>
+    <div class="atual">
+      <img id="atual-img" alt="" hidden>
+      <div style="flex: 1">
+        <div class="marca" id="atual-marca"></div>
+        <div class="nome" id="atual-nome">Nenhum perfume em análise</div>
+        <div class="etapa" id="atual-etapa"></div>
+      </div>
+    </div>
+    <div class="barra"><div id="rodada-barra" style="width: 0"></div></div>
+    <div class="legenda"><span id="rodada-texto">Rodada: –</span><span id="situacao">parado</span></div>
+  </div>
+</div>
+
+<!-- Progresso geral -->
+<div class="cartao" style="margin-bottom: 16px">
+  <h3>Progresso da biblioteca</h3>
+  <div class="barra grande"><div id="total-barra" style="width: 0"></div></div>
+  <div class="legenda"><span id="total-texto">…</span><span id="total-pct"></span></div>
+  <div class="numeros">
+    <div><strong id="n-coletado">–</strong>catalogados</div>
+    <div><strong id="n-pendente">–</strong>na fila</div>
+    <div><strong id="n-nao">–</strong>não encontrados</div>
+    <div><strong id="n-reviews">–</strong>reviews</div>
+  </div>
+</div>
+
+<div class="grade">
+  <div class="cartao">
+    <h3>Coletar</h3>
+    <p>Um perfume a cada 1–2 minutos, numa janela do navegador.</p>
     <form method="post" action="/painel/coletar">
       Coletar agora <input type="number" name="limite" value="5" min="1" max="50"> perfumes
       <button>Começar</button>
@@ -47,10 +99,9 @@
   </div>
 
   <div class="cartao">
-    <h3>3. Adicionar perfumes</h3>
-    <p>Cole o link do perfume no Fragrantica, ou informe marca e nome para o app procurar.</p>
+    <h3>Adicionar perfumes</h3>
     <form method="post" action="/perfume/novo">
-      <input type="url" name="url" placeholder="https://www.fragrantica.com/perfume/...">
+      <input type="url" name="url" placeholder="Link do perfume no Fragrantica">
       <button>Adicionar</button>
     </form>
     <form method="post" action="/perfume/novo">
@@ -65,33 +116,71 @@
   </div>
 </div>
 
-<div class="cartao" style="margin-top: 16px">
-  <div class="numeros">
-    <div><strong>{{ contagem.get('coletado', 0) }}</strong>catalogados</div>
-    <div><strong>{{ contagem.get('pendente', 0) }}</strong>na fila</div>
-    <div><strong>{{ contagem.get('nao_encontrado', 0) }}</strong>não encontrados</div>
-  </div>
-  <p style="margin: 14px 0 8px">Situação: <span id="status">…</span></p>
+<div class="cartao">
+  <h3>Atividade</h3>
   <pre id="log"></pre>
 </div>
 
 <script>
-const nomes = {login: "janela de login aberta", coleta: "coletando", auto: "modo automático ligado"};
+const nomes = {login: "fazendo login", coleta: "coletando", auto: "modo automático ligado"};
+const $ = id => document.getElementById(id);
+function mmss(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+let restante = null, etapaBase = "";
+
 async function atualizar() {
-  try {
-    const r = await fetch("/painel/estado");
-    const e = await r.json();
-    document.getElementById("status").textContent = e.tarefa ? nomes[e.tarefa] : "parado";
-    document.getElementById("form-login-ok").hidden = e.tarefa !== "login";
-    const log = document.getElementById("log");
-    const noFim = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
-    log.textContent = e.log.join("\n") || "Nenhuma atividade ainda.";
-    if (noFim) log.scrollTop = log.scrollHeight;
-  } catch (_) {
-    document.getElementById("status").textContent = "app fechado?";
+  let e;
+  try { e = await (await fetch("/painel/estado")).json(); }
+  catch (_) { $("situacao").textContent = "app fechado?"; return; }
+
+  // Conta
+  const c = e.conta || {};
+  $("conta-bolinha").className = "bolinha " + (e.tarefa === "login" ? "ativa" : c.logado ? "on" : "");
+  $("conta-texto").textContent = e.tarefa === "login" ? "Fazendo login na janela do navegador…"
+    : c.logado ? `Conectado${c.usuario ? " como " + c.usuario : ""} (desde ${c.quando})` : "Não conectado";
+  $("form-login-ok").hidden = e.tarefa !== "login";
+  $("form-login").querySelector("button").textContent = c.logado ? "Entrar novamente" : "Entrar";
+
+  // Item atual
+  const p = e.progresso, perf = p.perfume;
+  $("situacao").textContent = e.tarefa ? nomes[e.tarefa] : "parado";
+  $("atual-img").hidden = !perf;
+  if (perf) {
+    if ($("atual-img").src !== perf.imagem) $("atual-img").src = perf.imagem || "";
+    $("atual-marca").textContent = perf.marca || "";
+    $("atual-nome").innerHTML = `<a href="/perfume/${perf.id}">${perf.nome.replace(/</g, "&lt;")}</a>`;
+  } else {
+    $("atual-marca").textContent = "";
+    $("atual-nome").textContent = e.tarefa === "auto" ? "Descansando entre rodadas" : "Nenhum perfume em análise";
   }
+  etapaBase = p.etapa || "";
+  restante = p.restante ?? null;
+  mostrarEtapa();
+  const [i, n] = p.rodada;
+  $("rodada-barra").style.width = n ? `${(i / n) * 100}%` : "0";
+  $("rodada-texto").textContent = n ? `Rodada: perfume ${i} de ${n}` : "Rodada: –";
+
+  // Total
+  const k = e.contagem, feitos = k.coletado || 0, total = e.total || 0;
+  const pct = total ? (feitos / total) * 100 : 0;
+  $("total-barra").style.width = pct + "%";
+  $("total-texto").textContent = `${feitos} de ${total} perfumes catalogados`;
+  $("total-pct").textContent = pct.toFixed(1) + "%";
+  $("n-coletado").textContent = feitos;
+  $("n-pendente").textContent = k.pendente || 0;
+  $("n-nao").textContent = k.nao_encontrado || 0;
+  $("n-reviews").textContent = e.reviews;
+
+  // Log
+  const log = $("log"), noFim = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+  log.textContent = e.log.join("\n") || "Nenhuma atividade ainda.";
+  if (noFim) log.scrollTop = log.scrollHeight;
 }
+
+function mostrarEtapa() {
+  $("atual-etapa").textContent = etapaBase + (restante != null ? ` — ${mmss(restante)}` : "");
+}
+setInterval(() => { if (restante > 0) { restante--; mostrarEtapa(); } }, 1000);
 atualizar();
-setInterval(atualizar, 3000);
+setInterval(atualizar, 2500);
 </script>
 {% endblock %}

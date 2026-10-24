@@ -37,6 +37,11 @@ def test_limpar_titulo():
         ("Khamrah", "Eau de Parfum")
 
 
+def test_ignora_kits():
+    assert feed.KIT.search("Perfume Árabe Lattafa Pride 5x20ml Affection, Tharwah Gold e mais")
+    assert not feed.KIT.search("Perfume Árabe Lattafa Khamrah Eau de Parfum 100ml")
+
+
 def test_melhor_resultado():
     assert fragrantica.melhor_resultado(BUSCA, "Lattafa", "Khamrah").endswith("Khamrah-75805.html")
 

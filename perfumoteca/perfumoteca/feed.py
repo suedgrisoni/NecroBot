@@ -12,6 +12,7 @@ CATEGORIAS_PERFUME = ("Perfumes", "Perfume")
 PREFIXOS = re.compile(r"^(perfume|kit)\s+(árabe|arabe|importado|de nicho|nicho)?\s*", re.I)
 CONCENTRACOES = ["Extrait de Parfum", "Elixir", "Parfum", "Eau de Parfum Intense", "Eau de Parfum",
                  "Eau de Toilette", "Eau de Cologne", "Eau Fraiche", "Body Mist"]
+KIT = re.compile(r"\bkit\b|\d+\s?x\s?\d+\s?ml|\bcombo\b", re.I)
 TAMANHO = re.compile(r"\b\d+\s?(ml|g)\b.*$", re.I)
 
 
@@ -50,6 +51,8 @@ def importar(url_ou_arquivo, con=None):
         tipos = [e.text or "" for e in item.findall("g:product_type", NS)]
         if not any(t.startswith(CATEGORIAS_PERFUME) for t in tipos):
             continue  # ignora relógios, hidratantes, kits...
+        if KIT.search(item.findtext("title", "")):
+            continue  # kits com vários perfumes
         marca = html.unescape(item.findtext("g:brand", "", NS)).strip()
         nome, conc = limpar_titulo(item.findtext("title", ""), marca)
         if not nome:

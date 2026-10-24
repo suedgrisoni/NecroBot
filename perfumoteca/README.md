@@ -19,13 +19,18 @@ Precisa do [Python 3.10+](https://www.python.org/downloads/) (no Windows, marque
 - **Mac/Linux:** rode `./perfumoteca.sh`.
 
 Na primeira vez ele instala tudo sozinho (leva alguns minutos). Depois o app abre no navegador,
-no **Painel de coleta**, onde dá para fazer tudo por botões:
+na aba **Coleta**. O app tem duas abas:
 
-1. **Abrir janela de login**: abre o Fragrantica; entre na sua conta e clique em "Já entrei na minha conta".
-2. **Importar feed**: monta a lista de perfumes da loja (≈540 perfumes únicos).
-3. **Coletar agora** (comece com 3–5) ou **Ligar** o modo automático; **Parar** interrompe na hora.
-4. **Adicionar perfumes**: cole o link do Fragrantica ou informe marca e nome.
-5. **Biblioteca**: a estante com busca, filtros e a ficha de cada perfume.
+**Biblioteca**: a estante com busca, filtros e a ficha de cada perfume.
+
+**Coleta**:
+1. **Conta do Fragrantica**: digite usuário e senha e clique em Entrar. O app abre o site numa janela
+   e digita por você (a senha não é salva, só a sessão). Mostra se você está conectado.
+2. **Analisando agora**: foto e nome do perfume atual, a etapa (procurando, lendo a página,
+   salvando, pausa com contagem regressiva) e o avanço da rodada.
+3. **Progresso da biblioteca**: quantos perfumes já foram catalogados do total, fila, não encontrados e reviews.
+4. **Coletar agora** (comece com 3–5) ou **Ligar** o modo automático; **Parar** interrompe na hora.
+5. **Adicionar perfumes**: cole o link do Fragrantica, informe marca e nome, ou importe um feed.
 
 Para o app continuar coletando, deixe a janela do terminal aberta.
 
